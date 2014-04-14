@@ -36,7 +36,7 @@ int main(int argc, char** argv)     // 初始化Python
     }  
   
     // 参数进栈  
-    pArgs = PyTuple_New(2);  
+    pArgs = PyTuple_New(1);  
   
     // PyObject* Py_BuildValue(char *format, ...)  
     // 把C++的变量转换成一个Python对象。当需要从  
@@ -47,10 +47,24 @@ int main(int argc, char** argv)     // 初始化Python
     // f 表示浮点数，  
     // O 表示一个Python对象。b=f(a) 0.1-0.01=0.09  
   
-    PyTuple_SetItem(pArgs, 0, Py_BuildValue("i",3));   
-    PyTuple_SetItem(pArgs, 1, Py_BuildValue("i",4));   
+    PyTuple_SetItem(pArgs, 0, Py_BuildValue("s","127.0.0.1:14000"));   
   
     // 调用Python函数  
+    pRetVal = PyObject_CallObject(pFunc, pArgs);  
+    sleep(10)
+
+    pFunc = PyDict_GetItemString(pDict, "getvalue");  
+    if( !pFunc || !PyCallable_Check(pFunc) )           
+    {  
+        printf("can't find function [getvalue]"); 
+        getchar();  
+        return -1;  
+    }  
+
+    Py_DECREF(pArgs);  
+    Py_DECREF(pRetVal);  
+    pArgs = PyTuple_New(0);  
+    
     pRetVal = PyObject_CallObject(pFunc, pArgs);  
     printf("function return value : %d\r\n", PyInt_AsLong(pRetVal));  
   
