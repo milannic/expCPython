@@ -12,12 +12,11 @@ int main(int argc, char** argv)     // 初始化Python
     if ( !Py_IsInitialized() )           
         return -1;  
   
-    // 载入名为pytest的脚本(注意：不是pytest.py)  
-    pName = PyString_FromString("pytest");  
+    pName = PyString_FromString("counter");  
     pModule = PyImport_Import(pName);  
     if ( !pModule )   
     {  
-        printf("can't find pytest.py");  
+        printf("can't find counter");  
         getchar();  
         return -1;  
     }  
@@ -28,10 +27,10 @@ int main(int argc, char** argv)     // 初始化Python
     }  
   
     // 找出函数名为add的函数  
-    pFunc = PyDict_GetItemString(pDict, "add");  
+    pFunc = PyDict_GetItemString(pDict, "Counter");  
     if ( !pFunc || !PyCallable_Check(pFunc) )           
     {  
-        printf("can't find function [add]");  
+        printf("can't find function [add]"); 
         getchar();  
         return -1;  
     }  
