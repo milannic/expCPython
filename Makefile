@@ -1,9 +1,11 @@
 #PYTHONHEAD=/usr/include/python2.7
 CFLAGS= -c `python-config --cflags`
-LFLAGS= -L/usr/lib/python2.7/config -lpthread -ldl -lutil -lm -lpython2.7 -Xlinker -export-dynamic
+LFLAGS= `python-config --ldflags`
 CC=gcc
 
-PROG=cpython.e
+PROG=cpython.e \
+	 cpython_localtest.e \
+	 cpython_0.0.1 \
 
 .SUFFIXES: .c .o
 
@@ -15,6 +17,9 @@ default: all
 all: $(PROG)
 
 
+cpython_localtest.e: cpython_localtest.o
+	$(CC) $< $(LFLAGS)  -o $@
+
 cpython.e: cpython.o
 	$(CC) $< $(LFLAGS)  -o $@
 
@@ -22,4 +27,3 @@ clean:
 	$(RM) *.o
 	$(RM) $(PROG)
 	$(RM) *.pyc
-	$(RM) *.e

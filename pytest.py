@@ -5,3 +5,10 @@ def add(a,b):
     print "b = " + str(b)  
     print "ret = " + str(a+b)  
     return a + b  
+
+class MyTest():
+    def __init__(self):
+        self.num1 = 1
+        self.num2 = 2
+    def myAdd(self):
+        return self.num1+self.num2
