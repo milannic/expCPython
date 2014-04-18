@@ -5,6 +5,6 @@ all:: install test
 
 .PHONY:install
 install:
-	gcc -fpic -rdynamic -shared $(CFLAGS) $(LDFLAGS) -lrt -o ldi.so rand-intercept.c 
+	gcc -g -fpic -rdynamic -shared $(CFLAGS) $(LDFLAGS) -lrt -o ldi.so rand-intercept.c 
 
 test:test.o

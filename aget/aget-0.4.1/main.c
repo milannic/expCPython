@@ -28,6 +28,8 @@ int main(int argc, char **argv)
 	 * of interest
 	 */
 	req = (struct request *)calloc(1, sizeof(struct request));
+	fprintf(stderr,"%d\n",sizeof(int));
+	fprintf(stderr,"%d\n",sizeof(unsigned));
 
 	/* Only some signals will be emitted	*/
 	sigemptyset(&signal_set);
