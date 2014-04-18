@@ -1,5 +1,6 @@
 // C代码调，用上面的add函数  
-#include <stdio.h>  #include <stdlib.h>  
+#include <stdio.h>  
+#include <stdlib.h>  
 #include "Python.h"  
   
 int main(int argc, char** argv)     // 初始化Python  
@@ -16,11 +17,11 @@ int main(int argc, char** argv)     // 初始化Python
         return -1;  
   
     // 载入名为pytest的脚本(注意：不是pytest.py)  
-    pName = PyString_FromString("counter");  
+    pName = PyString_FromString("concoord.proxy.counter");  
     pModule = PyImport_Import(pName);  
     if ( !pModule )   
     {  
-        printf("can't find counter.py");  
+        printf("can't find concoord module");  
         getchar();  
         return -1;  
     }  
@@ -82,7 +83,6 @@ int main(int argc, char** argv)     // 初始化Python
 	Py_DECREF(pIns);
 	Py_DECREF(pClass);
     Py_DECREF(pArgs);  
-	//if(pRetVal!=NULL)
 	Py_DECREF(pRetVal);  
   
     // 关闭Python  

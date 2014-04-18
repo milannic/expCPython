@@ -23,6 +23,7 @@ cpython_localtest.e: cpython_localtest.o
 cpython.e: cpython.o
 	$(CC) $< $(LFLAGS)  -o $@
 
+.PHONY:clean
 clean:
 	$(RM) *.o
 	$(RM) $(PROG)
