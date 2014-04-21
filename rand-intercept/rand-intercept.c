@@ -463,7 +463,7 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t *rwlock, const struct timespec *
 }
 
 
-
+//Milannic
 int socket(int domain, int type, int protocol){
 	OPERATION_START;
 	// Python Variables
@@ -564,7 +564,7 @@ ssize_t recv(int socket, void *buffer, size_t length, int flags) {
 
 int shutdown(int socket, int how){
 	PyObject * py_socket;
-	if(py_socket>0){
+	if(socket>0){
 		py_socket= (PyObject*)(socket);
 		Py_DECREF(py_socket);
 	}
