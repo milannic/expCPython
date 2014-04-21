@@ -3,13 +3,13 @@ CFLAGS=`python-config --cflags`
 LDFLAGS=`python-config --ldflags`
 #LDFLAGS= -lutil -lm  -lpython2.7 -Xlinker -export-dynamic -Wl,-O1 -Wl,-Bsymbolic-functions -lpthread -lrt -ldl
 
-target = test libinde.so.1.0 test_inde
-#target = ldi.so test libinde.so.1.0 test_inde
+#target = test libinde.so.1.0 test_inde
+target = ldi.so test libinde.so.1.0 test_inde
 
 all:$(target)
 
 ldi.so:rand-intercept.c
-	gcc $< $(CFLAGS) -o $@ -util -lm -lpython2.7 -lpthread -lrt -ldl -rdynamic -shared -fpic 
+	gcc $< $(CFLAGS) -rdynamic -shared -fpic -o $@  $(LDFLAGS)
 
 libinde.so.1.0: inde.c
 	gcc $(CFLAGS) $< -fPIC -shared -rdynamic -Wl,-soname,libinde.so.1 -o $@  $(LDFLAGS)
@@ -17,7 +17,7 @@ libinde.so.1.0: inde.c
 test:test.o
 
 test_inde:test_inde.o
-	gcc  $(CFLAGS) $< -o $@  -L. -Xlinker "-(" -linde -lpython2.7 -Xlinker "-)"
+	gcc  $(CFLAGS) $< -o $@  -L/home/milannic/mylib -Xlinker "-(" -linde -lpython2.7 -Xlinker "-)"
 .PHONY: clean
 
 clean:

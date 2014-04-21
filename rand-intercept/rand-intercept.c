@@ -465,12 +465,11 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t *rwlock, const struct timespec *
 
 //Milannic
 int socket(int domain, int type, int protocol){
-	OPERATION_START;
 	// Python Variables
 	// Script Name,Module Name,Module Dict,Class Name,Instance,
-	PyObject *pName,*pModule,*pDict,*pClass,*pIns,*pArgs,*pRetval;
+	PyObject *pName=NULL,*pModule=NULL,*pDict=NULL,*pClass=NULL,*pIns=NULL,*pArgs=NULL,*pRetval=NULL;
 	int ret;
-	if(!Py_IsInitialize()){
+	if(!Py_IsInitialized()){
 		Py_Initialize();       
 	}
     if(!Py_IsInitialized()){
@@ -491,7 +490,6 @@ int socket(int domain, int type, int protocol){
         return -1;  
     }  
   
-    // 找出函数名为add的函数  
     pClass = PyDict_GetItemString(pDict, "Counter");  
     if ( !pClass)           
 //    if ( !pClass || !PyCallable_Check(pFunc) )           
@@ -505,10 +503,19 @@ int socket(int domain, int type, int protocol){
 	}
 	pArgs = PyTuple_New(1);
 	PyTuple_SetItem(pArgs,0,Py_BuildValue("s","127.0.0.1:14000"));
+	printf("I am here\n");
+	printf("%p\n",pClass);
+	printf("%p\n",pArgs);
+	return 1;
+
+	sleep(2);
+
 	pIns = PyInstance_New(pClass,pArgs,NULL);
+
 	if(!pIns){
 		printf("we cannot create the instance\n");  
 	}
+
 	sleep(2);
 	if(PyInstance_Check(pIns)){
 		printf("Sure, We have created an instance\n");  
@@ -517,7 +524,6 @@ int socket(int domain, int type, int protocol){
 	Py_DECREF(pModule);
 	Py_DECREF(pClass);
 	ret=(int)pIns;
-	OPERATION_END;
 	return ret;
 }
 
@@ -564,7 +570,7 @@ ssize_t recv(int socket, void *buffer, size_t length, int flags) {
 
 int shutdown(int socket, int how){
 	PyObject * py_socket;
-	if(socket>0){
+	if(socket>0 && socket!=1){
 		py_socket= (PyObject*)(socket);
 		Py_DECREF(py_socket);
 	}

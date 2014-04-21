@@ -14,6 +14,6 @@ main ( int argc, char *argv[] )
 	fprintf(stderr,"%d\n",sizeof(socket_num2));
 	socket_num = socket(AF_INET,SOCK_STREAM,0);
 	fprintf(stderr,"%d\n",socket_num);
-	close(socket_num);
+	shutdown(socket_num,0);
 	return EXIT_SUCCESS;
 }				/* ----------  end of function main  ---------- */

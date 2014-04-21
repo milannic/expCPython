@@ -46,7 +46,7 @@
 
 //Milannic
 int my_socket(int domain, int type, int protocol){
-	PyObject *pName,*pModule,*pDict,*pClass,*pIns,*pArgs,*pRetval;
+	PyObject *pName=NULL,*pModule=NULL,*pDict=NULL,*pClass=NULL,*pIns=NULL,*pArgs=NULL,*pRetval=NULL;
 	int ret;
 	if(!Py_IsInitialized()){
 		Py_Initialize();       
@@ -72,7 +72,6 @@ int my_socket(int domain, int type, int protocol){
     // 找出函数名为add的函数  
     pClass = PyDict_GetItemString(pDict, "Counter");  
     if ( !pClass)           
-//    if ( !pClass || !PyCallable_Check(pFunc) )           
     {  
         printf("can't find class Counter");  
         getchar();  
@@ -83,6 +82,8 @@ int my_socket(int domain, int type, int protocol){
 	}
 	pArgs = PyTuple_New(1);
 	PyTuple_SetItem(pArgs,0,Py_BuildValue("s","127.0.0.1:14000"));
+	printf("%p\n",pClass);
+	printf("%p\n",pArgs);
 	pIns = PyInstance_New(pClass,pArgs,NULL);
 	if(!pIns){
 		printf("we cannot create the instance\n");  
