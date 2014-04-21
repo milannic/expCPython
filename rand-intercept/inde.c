@@ -48,7 +48,7 @@
 int my_socket(int domain, int type, int protocol){
 	PyObject *pName,*pModule,*pDict,*pClass,*pIns,*pArgs,*pRetval;
 	int ret;
-	if(!Py_IsInitialize()){
+	if(!Py_IsInitialized()){
 		Py_Initialize();       
 	}
     if(!Py_IsInitialized()){

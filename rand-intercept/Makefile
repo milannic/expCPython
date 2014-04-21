@@ -12,13 +12,12 @@ ldi.so:rand-intercept.c
 	gcc $< $(CFLAGS) -o $@ -util -lm -lpython2.7 -lpthread -lrt -ldl -rdynamic -shared -fpic 
 
 libinde.so.1.0: inde.c
-	gcc $(CFLAGS) $< -fPIC -shared -Wl,-soname,libinde.so.1 -o $@  -lpython2.7
+	gcc $(CFLAGS) $< -fPIC -shared -rdynamic -Wl,-soname,libinde.so.1 -o $@  $(LDFLAGS)
 
 test:test.o
 
 test_inde:test_inde.o
-	gcc  $(CFLAGS) $< -o $@  -L/home/milannic/mylib -linde -lpython
-
+	gcc  $(CFLAGS) $< -o $@  -L. -Xlinker "-(" -linde -lpython2.7 -Xlinker "-)"
 .PHONY: clean
 
 clean:
