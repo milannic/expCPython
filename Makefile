@@ -3,9 +3,9 @@ CFLAGS= -c `python-config --cflags`
 LFLAGS= `python-config --ldflags`
 CC=gcc
 
-PROG=cpython.e \
-	 cpython_localtest.e \
-	 cpython_0.0.1 \
+PROG=cpython.out \
+	 cpython_localtest.out \
+	 cpython_0.0.1.out \
 
 .SUFFIXES: .c .o
 
@@ -17,10 +17,13 @@ default: all
 all: $(PROG)
 
 
-cpython_localtest.e: cpython_localtest.o
+cpython_localtest.out: cpython_localtest.o
 	$(CC) $< $(LFLAGS)  -o $@
 
-cpython.e: cpython.o
+cpython_0.0.1.out: cpython_0.0.1.o
+	$(CC) $< $(LFLAGS)  -o $@
+
+cpython.out: cpython.o
 	$(CC) $< $(LFLAGS)  -o $@
 
 .PHONY:clean
