@@ -1,27 +1,35 @@
 CFLAGS=`python-config --cflags`
-#CFLAGS=-I/usr/include/python2.7 -I/usr/include/x86_64-linux-gnu/python2.7  -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -g -fstack-protector --param=ssp-buffer-size=4 -Wformat -Werror=format-security  -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes
 LDFLAGS=`python-config --ldflags`
-#LDFLAGS= -lutil -lm  -lpython2.7 -Xlinker -export-dynamic -Wl,-O1 -Wl,-Bsymbolic-functions -lpthread -lrt -ldl
 
-#target = test libinde.so.1.0 test_inde
-target = ldi.so test libinde.so.1.0 test_inde
+target = libconcoord.so.1.0 \
+		 libinde.so.1.0\
+		 libinde.so \
+		 test_inde.out \
+		 test.out \
+
+
 
 all:$(target)
 
-ldi.so:rand-intercept.c
-	gcc $< $(CFLAGS) -rdynamic -shared -fpic -o $@  $(LDFLAGS)
+libconcoord.so.1.0:rand-intercept.c
+	gcc $< $(CFLAGS) -Wl,-soname,libconcoord.so.1 -rdynamic -shared -fpic -o $@ $(LDFLAGS) 
 
 libinde.so.1.0: inde.c
-	gcc $(CFLAGS) $< -fPIC -shared -rdynamic -Wl,-soname,libinde.so.1 -o $@  $(LDFLAGS)
+	gcc $(CFLAGS)  -fPIC -shared -rdynamic -Wl,-soname,libinde.so.1 -o $@  $(LDFLAGS) $<
 
-test:test.o
+test.out:test.o
+	gcc -Wall -g -rdynamic -o $@ $<
 
-test_inde:test_inde.o
-	gcc  $(CFLAGS) $< -o $@  -L/home/milannic/mylib -Xlinker "-(" -linde -lpython2.7 -Xlinker "-)"
-.PHONY: clean
+test_inde.out:test_inde.o libinde.so
+	gcc  $(CFLAGS) $< -o $@  -L. -Xlinker "-(" -linde -lpython2.7 -Xlinker "-)"
+.PHONY: clean link
+
+libinde.so: libinde.so.1.0
+	ln -sf libinde.so.1.0 libinde.so.1
+	ln -sf libinde.so.1.0 libinde.so
 
 clean:
 	rm $(target)
-	rm test.o
-	rm test_inde
+	rm *.o
+	rm *.out
 	rm lib*

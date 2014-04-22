@@ -1,5 +1,8 @@
 #! /bin/sh
 CUR_DIR=$(pwd)
-LD_LIB="${CUR_DIR}/ldi.so"
+LD_LIB="${CUR_DIR}/libconcoord.so.1.0"
 
-LD_PRELOAD=${LD_LIB} ./test
+make;
+make link;
+
+LD_PRELOAD=${LD_LIB} ./test.out

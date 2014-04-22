@@ -48,15 +48,23 @@
 #define RESOLVE(x)	if (!fp_##x && !(fp_##x = dlsym(RTLD_NEXT, #x))) { fprintf(stderr, #x"() not found!\n"); exit(-1); }
 #define DO_LOGGING 0 // If it is 1, enable logging (logging sync ops, and updating times).
 
+#define MAXSIZE 128
+
+#define MAXSOCKET 1000
+
 // Per thread variables.
 static int num_threads = 0;
 static int turn = 0;
+static void* python_object_pool[MAXSOCKET];
+static int python_object_pool_index = 1;
+
 static __thread int self_turn = -1;
 static __thread int self_tid = -1;
 static __thread struct timespec my_time;
 static __thread int entered_sys = 0; // Avoid recursively enter backtrace(), since backtrace() will call pthread_mutex_lock().
 static __thread FILE *xtern_log = NULL;
 static pthread_mutex_t lock;
+
 
 
 #define OPERATION_START \
@@ -464,67 +472,134 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t *rwlock, const struct timespec *
 
 
 //Milannic
+static int (*fp_socket)(int domain, int type, int protocol);
 int socket(int domain, int type, int protocol){
 	// Python Variables
 	// Script Name,Module Name,Module Dict,Class Name,Instance,
-	PyObject *pName=NULL,*pModule=NULL,*pDict=NULL,*pClass=NULL,*pIns=NULL,*pArgs=NULL,*pRetval=NULL;
-	int ret;
-	if(!Py_IsInitialized()){
-		Py_Initialize();       
-	}
-    if(!Py_IsInitialized()){
-		fprintf(stderr,"cannot initialize Python Runntime\n");
-		return -1;
-	}
-    pName = PyString_FromString("concoord.proxy.counter");  
-    pModule = PyImport_Import(pName);  
-    if (!pModule )   
-    {  
-        fprintf(stderr,"can't find concoord module");  
-        return -1;  
-    }  
-    pDict = PyModule_GetDict(pModule);  
-    if ( !pDict )           
-    {  
-        fprintf(stderr,"can't find concoord namespace");  
-        return -1;  
-    }  
-  
-    pClass = PyDict_GetItemString(pDict, "Counter");  
-    if ( !pClass)           
-//    if ( !pClass || !PyCallable_Check(pFunc) )           
-    {  
-        printf("can't find class Counter");  
-        getchar();  
-        return -1;  
-    }  
-	if(PyClass_Check(pClass)){
-		printf("we have found the class\n");
-	}
-	pArgs = PyTuple_New(1);
-	PyTuple_SetItem(pArgs,0,Py_BuildValue("s","127.0.0.1:14000"));
-	printf("I am here\n");
-	printf("%p\n",pClass);
-	printf("%p\n",pArgs);
-	return 1;
+	void* high_address = 0x7f0000000000;
+	void *EIP[MAXSIZE],*eip; 
+	int backtrace_size,ret=1,index=0,intercept_flag=0;
+	char** backtrace_symbols_strs = NULL;	
+	PyObject *pName=NULL,*pModule=NULL,*pDict=NULL,*pClass=NULL,*pIns=NULL,*pArgs=NULL,*pRetVal=NULL;
 
-	sleep(2);
+	fprintf(stderr,"we are calling socket\n");
+	backtrace_size = backtrace(EIP,MAXSIZE);
+	backtrace_symbols_strs = backtrace_symbols(EIP,backtrace_size);
 
-	pIns = PyInstance_New(pClass,pArgs,NULL);
-
-	if(!pIns){
-		printf("we cannot create the instance\n");  
+#if  1     /* ----- backtrace info ----- */
+	for ( index = 0; index < backtrace_size; index += 1 ) {
+		fprintf(stderr,"%s\n",backtrace_symbols_strs[index]);
 	}
+	fprintf(stderr,"------------------------------\n");  
+#endif     /* ----- #if 0 : If0Label_1 ----- */
+	free(backtrace_symbols_strs);
+	eip = get_eip();
+	fprintf(stderr,"current EIP is %p\n",eip);
 
-	sleep(2);
-	if(PyInstance_Check(pIns)){
-		printf("Sure, We have created an instance\n");  
+	if(eip>high_address){
+		intercept_flag = 0;
+		fprintf(stderr,"this is a shared library calling\n");
+	}else{
+		fprintf(stderr,"we should intercept this function\n");
+		intercept_flag = 1;
 	}
-	Py_DECREF(pName);
-	Py_DECREF(pModule);
-	Py_DECREF(pClass);
-	ret=(int)pIns;
-	return ret;
+	if(intercept_flag==0){
+	  fprintf(stderr,"we give the original function\n");
+	  RESOLVE(socket);
+	  ret = fp_socket(domain, type, protocol);
+	  return ret;
+	}
+	else{
+		fprintf(stderr,"we should calling the remote concoord function\n");
+		if(!Py_IsInitialized()){
+			Py_Initialize();       
+		}
+		if(!Py_IsInitialized()){
+			fprintf(stderr,"cannot initialize Python Runntime\n");
+			return -1;
+		}
+		pName = PyString_FromString("concoord.proxy.counter");  
+		pModule = PyImport_Import(pName);  
+		if (!pModule )   
+		{  
+			fprintf(stderr,"can't find concoord module");  
+			return -1;  
+		}  
+		pDict = PyModule_GetDict(pModule);  
+		if ( !pDict )           
+		{  
+			fprintf(stderr,"can't find concoord namespace");  
+			return -1;  
+		}  
+	  
+		pClass = PyDict_GetItemString(pDict, "Counter");  
+		if ( !pClass)           
+	//    if ( !pClass || !PyCallable_Check(pFunc) )           
+		{  
+			printf("can't find class Counter");  
+			getchar();  
+			return -1;  
+		}  
+		if(PyClass_Check(pClass)){
+			printf("we have found the class\n");
+		}
+
+		pArgs = PyTuple_New(1);
+		PyTuple_SetItem(pArgs,0,Py_BuildValue("s","127.0.0.1:14000"));
+		printf("I am here\n");
+		printf("%p\n",pClass);
+		printf("%p\n",pArgs);
+
+		sleep(2);
+
+		pIns = PyInstance_New(pClass,pArgs,NULL);
+
+		if(!pIns){
+			printf("we cannot create the instance\n");  
+			Py_DECREF(pName);
+			Py_DECREF(pModule);
+			Py_DECREF(pClass);
+			Py_DECREF(pArgs);
+			return -1;
+		}
+
+		sleep(2);
+		if(PyInstance_Check(pIns)){
+			printf("Sure, We have created an instance\n");  
+		}
+
+		if(pIns){
+			pRetVal=PyObject_CallMethod(pIns,"getvalue",NULL);
+		}
+
+		if(pRetVal){
+			printf("we call the getvalue method, and the return value is %ld\n",PyInt_AsLong(pRetVal));
+			Py_DECREF(pRetVal);
+		}
+
+		//Py_DECREF(pRetVal);
+
+		pRetVal=PyObject_CallMethod(pIns,"increment",NULL);
+		if(pRetVal){
+			printf("we call the increment method\n");
+			Py_DECREF(pRetVal);
+		}
+	//
+	//	sleep(2);
+		pRetVal=PyObject_CallMethod(pIns,"getvalue",NULL);
+
+		if(pRetVal){
+			printf("we call the getvalue method, and the return value is %ld\n",PyInt_AsLong(pRetVal));
+		}
+		Py_DECREF(pRetVal);  
+		Py_DECREF(pName);
+		Py_DECREF(pModule);
+		Py_DECREF(pClass);
+		Py_DECREF(pArgs);
+		python_object_pool[python_object_pool_index]=(void*)pIns;
+		ret=python_object_pool_index++;
+		return ret;
+	}
 }
 
 //}
@@ -569,9 +644,11 @@ ssize_t recv(int socket, void *buffer, size_t length, int flags) {
 //int listen(int socket, int backlog);
 
 int shutdown(int socket, int how){
+	fprintf(stderr,"socket is %d\n",socket);
+	fprintf(stderr,"socket is %p\n",python_object_pool[socket]);
 	PyObject * py_socket;
 	if(socket>0 && socket!=1){
-		py_socket= (PyObject*)(socket);
+		py_socket= (PyObject*)(python_object_pool[socket]);
 		Py_DECREF(py_socket);
 	}
     Py_Finalize();  
