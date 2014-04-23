@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <netinet/in.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -45,6 +46,8 @@
 #define PROJECT_TAG "XTERN"
 #define RESOLVE(x)	if (!fp_##x && !(fp_##x = dlsym(RTLD_NEXT, #x))) { fprintf(stderr, #x"() not found!\n"); exit(-1); }
 #define DO_LOGGING 1 // If it is 1, enable logging (logging sync ops, and updating times).
+#define MAXSIZE 1024
+
 
 // Per thread variables.
 static int num_threads = 0;
@@ -57,6 +60,7 @@ static __thread FILE *log = NULL;
 static pthread_mutex_t lock;
 
 
+//if(self_tid==0){fprintf(stderr,"%d here OPERATION start\n",self_tid);fflush(stderr);fprintf(stderr,"There is %d threads in total\n",num_threads);} 
 #define OPERATION_START \
   initTid(); \
   void *eip; \
@@ -73,12 +77,12 @@ static pthread_mutex_t lock;
   if (DO_LOGGING && !entered_sys) { \
     entered_sys = 1; \
     update_time(&syscall_time); \
-    if(self_tid==0)fprintf(stderr,"I am here\n"); \
     eip = get_eip(); \
     logOp(__FUNCTION__, eip, self_tid, self_turn, &app_time, &syscall_time); \
     entered_sys = 0; \
   }
 
+//if(self_tid==0){fprintf(stderr,"I am here OPERATION END\n");fflush(stderr);}
 
 void update_time(struct timespec *ret);
 int internal_mutex_lock(pthread_mutex_t *mutex);
@@ -90,6 +94,7 @@ int self() {
 }
 
 void initTid() {
+  //fprintf(stderr,"%d here OPERATION start\n",self_tid);
   if (self_tid == -1) {
     internal_mutex_lock(&lock);
     self_tid = num_threads;
@@ -135,14 +140,14 @@ void *get_eip()
 {
   const int SIZE = 5;
   void *tracePtrs[SIZE];
-  if(self_tid==0)
-  fprintf(stderr,"I am here2\n");
-  fflush(stderr);
+  //if(self_tid==0)
+  //fprintf(stderr,"I am here get eip start \n");
+  //fflush(stderr);
   int ret = backtrace(tracePtrs, SIZE);
   assert(ret >= 0);
-  if(self_tid==0)
-  fprintf(stderr,"I am here3\n");
-  fflush(stderr);
+//  if(self_tid==0)
+//  fprintf(stderr,"I am here get eip end\n");
+//  fflush(stderr);
   //fprintf(stderr,"I am %d\n",self_tid);
 #if 0
   /* For most of applications, returning the [2] is fine, which shows the locations calling sync op.
@@ -184,18 +189,30 @@ void logOp(const char *op, void *eip, int tid, int self_turn, struct timespec *a
 
 static int (*fp_pthread_mutex_lock)(pthread_mutex_t *mutex);
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_lock\n");
+      fflush(stderr);
+  }
   OPERATION_START;
   //fprintf(stderr, "tid %d before mutex lock %p\n", self(), (void *)mutex);fflush(stderr);
   RESOLVE(pthread_mutex_lock);
   int ret = fp_pthread_mutex_lock(mutex);
   int cur_errno = errno;
   OPERATION_END;
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_lock end\n");
+      fflush(stderr);
+  }
   //fprintf(stderr, "Self %u, tid %d after mutex locked %p, eip %p\n\n", (unsigned)pthread_self(), self(), (void *)mutex, eip);fflush(stderr);
   errno = cur_errno;
   return ret;
 }
 
 int internal_mutex_lock(pthread_mutex_t *mutex) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here internal_mutex_lock\n");
+      fflush(stderr);
+  }
   RESOLVE(pthread_mutex_lock);
   int ret = fp_pthread_mutex_lock(mutex);
   return ret;
@@ -203,6 +220,10 @@ int internal_mutex_lock(pthread_mutex_t *mutex) {
 
 static int (*fp_pthread_mutex_unlock)(pthread_mutex_t *mutex);
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_unlock\n");
+      fflush(stderr);
+  }
   OPERATION_START;
   //fprintf(stderr, "tid %d before mutex un lock %p\n", self(), (void *)mutex);fflush(stderr);
   RESOLVE(pthread_mutex_unlock);
@@ -215,13 +236,25 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 }
 
 int internal_mutex_unlock(pthread_mutex_t *mutex) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here internal_mutex_unlock\n");
+      fflush(stderr);
+  }
   RESOLVE(pthread_mutex_unlock);
   int ret = fp_pthread_mutex_unlock(mutex);
+  if(self_tid==-2){
+      fprintf(stderr, "I am here internal_mutex_unlock END\n");
+      fflush(stderr);
+  }
   return ret;
 }
 
 static int (*fp_pthread_mutex_trylock)(pthread_mutex_t *mutex);
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_trylock\n");
+      fflush(stderr);
+  }
   OPERATION_START;
   RESOLVE(pthread_mutex_trylock);
   int ret = fp_pthread_mutex_trylock(mutex);
@@ -233,6 +266,10 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
 
 static int (*fp_pthread_mutex_init)(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr);
 int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_init\n");
+      fflush(stderr);
+  }
   OPERATION_START;
   RESOLVE(pthread_mutex_init);
   //fprintf(stderr, "before mutex init %p, %p\n", (void *)mutex, (void *)attr);
@@ -246,6 +283,10 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr) 
 
 static int (*fp_pthread_mutex_destroy)(pthread_mutex_t *mutex);
 int pthread_mutex_destroy(pthread_mutex_t *mutex) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_destroy\n");
+      fflush(stderr);
+  }
   OPERATION_START;
   RESOLVE(pthread_mutex_destroy);
   int ret = fp_pthread_mutex_destroy(mutex);
@@ -257,6 +298,10 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex) {
 
 static int (*fp_pthread_create)(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg) {
+  if(self_tid==-2){
+      fprintf(stderr, "I am here pthread_mutex_create\n");
+      fflush(stderr);
+  }
   OPERATION_START;
   RESOLVE(pthread_create);
   int ret = fp_pthread_create(thread, attr, start_routine, arg);
@@ -280,6 +325,8 @@ int pthread_join(pthread_t thread, void **retval) {
 
 static void (*fp_pthread_exit)(void *retval);
 void pthread_exit(void *retval) {
+  //fprintf(stderr, "thread %d am here pthread_exit\n",self_tid);
+  //fflush(stderr);
   if (entered_sys == 0) { // This is a little bit tricky, if not do this, deadlock, since pthread_exit() will call pthread_mutex_lock...
     OPERATION_START;
     RESOLVE(pthread_exit);
@@ -288,8 +335,20 @@ void pthread_exit(void *retval) {
   }
   fp_pthread_exit(retval);
 }
-
-//int pthread_cancel(pthread_t thread);
+static int (*fp_pthread_cancel)(pthread_t thread);
+int pthread_cancel(pthread_t thread){
+  //fprintf(stderr, "thread %d am here pthread_cancel\n",self_tid);
+  //fflush(stderr);
+  int ret=0;
+  if (entered_sys == 0) { // This is a little bit tricky, if not do this, deadlock, since pthread_exit() will call pthread_mutex_lock...
+    OPERATION_START;
+    RESOLVE(pthread_cancel);
+    OPERATION_END;
+    entered_sys = 1;
+  }
+  ret=fp_pthread_cancel(thread);
+  return ret;
+};
 /*
 static int (*fp_pthread_cond_init)(pthread_cond_t *cond, const pthread_condattr_t *attr);
 int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr) {
@@ -470,6 +529,7 @@ int pthread_rwlock_timedrdlock(pthread_rwlock_t *rwlock, const struct timespec *
 
 static int (*fp_socket)(int domain, int type, int protocol);
 int socket(int domain, int type, int protocol){
+  fprintf(stderr,"domain : %d , type : %d , protocol : %d \n",domain,type,protocol);
   OPERATION_START;
   RESOLVE(socket);
   int ret = fp_socket(domain,type,protocol);
@@ -479,31 +539,73 @@ int socket(int domain, int type, int protocol){
   return ret;
 }
 
-#if 1
 static int (*fp_close)(int fd);
 int close(int fd) {
-  fprintf(stderr, "current file descriptor is %d\n",fd);
+#if  0     /* ----- backtrace info ----- */
+	void* high_address = 0x7f0000000000;
+	void *EIP[MAXSIZE],*eip; 
+	int backtrace_size,index=0,intercept_flag=0;
+	char** backtrace_symbols_strs = NULL;	
+
+	fprintf(stderr,"we are calling close\n");
+	backtrace_size = backtrace(EIP,MAXSIZE);
+	backtrace_symbols_strs = backtrace_symbols(EIP,backtrace_size);
+
+	for ( index = 0; index < backtrace_size; index += 1 ) {
+		fprintf(stderr,"%s\n",backtrace_symbols_strs[index]);
+	}
+	fprintf(stderr,"------------------------------\n");  
+	free(backtrace_symbols_strs);
+	eip = get_eip();
+	fprintf(stderr,"current EIP is %p\n",eip);
+
+	if(eip>high_address){
+		intercept_flag = 0;
+		fprintf(stderr,"this is a shared library calling\n");
+	}else{
+		fprintf(stderr,"we should intercept this function\n");
+		intercept_flag = 1;
+	}
+#endif     /* ----- #if 0 : If0Label_1 ----- */
+
+
+  if(self_tid==-2){
+      fprintf(stderr,"I am here close start\n"); 
+      fprintf(stderr, "current file descriptor is %d\n",fd);
+      fflush(stderr);
+  }
+  int ret=0;
+  int cur_errno=0;
+
   OPERATION_START;
   RESOLVE(close);
-  int ret = fp_close(fd);
-  int cur_errno = errno;
-  struct timespec syscall_time; 
-  if (DO_LOGGING && !entered_sys) { 
-    entered_sys = 1; 
-    update_time(&syscall_time); 
-    if(self_tid==0)fprintf(stderr,"I am heren\n"); 
-    eip = get_eip(); 
-    logOp(__FUNCTION__, eip, self_tid, self_turn, &app_time, &syscall_time); 
-    entered_sys = 0; 
+  ret = fp_close(fd);
+
+  if(self_tid==-2){
+      fprintf(stderr,"I am here close start end\n"); 
+      fflush(stderr);
   }
+  OPERATION_END;
+  cur_errno = errno;
   errno = cur_errno;
   return ret;
 }
-#endif
 
 
+static ssize_t (*fp_send)(int socket, const void *buffer, size_t length, int flags);
 
-//ssize_t send(int socket, const void *buffer, size_t length, int flags);
+ssize_t send(int socket, const void *buffer, size_t length, int flags){
+    
+  fprintf(stderr,"this is thread %d\n",self_tid);
+  fprintf(stderr,"socket : %d , content : %s , length : %d \n",socket,(char*)buffer,(int)length);
+  OPERATION_START;
+  RESOLVE(send);
+  ssize_t ret = fp_send(socket, buffer, length, flags);
+  int cur_errno = errno;
+  OPERATION_END;
+  errno = cur_errno;
+  return ret;
+};
 
 //ssize_t sendto(int socket, const void *message, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len);
 
@@ -522,6 +624,9 @@ ssize_t recv(int socket, void *buffer, size_t length, int flags) {
 
 static int (*fp_connect)(int socket, const struct sockaddr *address, socklen_t address_len);
 int connect(int socket, const struct sockaddr *address, socklen_t address_len){
+  struct sockaddr_in* in_address=address;
+  fprintf(stderr,"socket : %d , port : %u , addr : %u , socklen : %d \n",socket,in_address->sin_port,in_address->sin_addr.s_addr,(int)address_len);
+    
   OPERATION_START;
   RESOLVE(connect);
   int ret = fp_connect(socket,address,address_len);
