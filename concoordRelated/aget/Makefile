@@ -1,8 +1,26 @@
-all:: install
+CFLAGS=`python-config --cflags`
+LDFLAGS=`python-config --ldflags`
+CC=gcc
 
-install::
-	gcc -g -rdynamic -Wall -shared -fpic -o rand-intercept.so rand-intercept.c -lpthread -lrt -ldl
+target = libpctern.so.1.0 \
 
-.PHONY: clean
+all:$(target)
+
+libpctern.so.1.0:pctern.o
+	$(CC) $< -Wl,-soname,libpctern.so.1 -rdynamic -shared -fpic -o $@ $(LDFLAGS) 
+
+pctern.o:pctern.c
+	$(CC) $(CFLAGS) -fpic -g -c -o $@ $<
+
+
+.PHONY: clean link
+
+link:
+	ln -sf libpctern.so.1.0 libpctern.so.1
+	ln -sf libpctern.so.1.0 libpctern.so
+
 clean:
-	rm rand-intercept.so
+	rm -rf *.o
+	rm -rf *.out
+	rm -rf libpctern*
+	rm -rf $(target)
