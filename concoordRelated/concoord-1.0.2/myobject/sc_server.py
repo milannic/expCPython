@@ -27,6 +27,7 @@ class SimpleConcoordServer():
         self.socket_count = 0
         self.socket_dict = {}
         self.running = 0
+        self.debug=1
 
     #test function, just to make sure this concoord object works
     def test(self):
@@ -75,7 +76,8 @@ class SimpleConcoordServer():
             # Check if the process that we killed is alive.
             # If the process has been killed, then it should raise a exception
             try: 
-               print "we test whether it is still here"
+               if self.debug:
+                   print "we test whether it is still here"
                os.kill(int(self.cpid), 0)
                return -1
             except Exception,e:
@@ -97,9 +99,10 @@ class SimpleConcoordServer():
             new_socket = socket.socket(domain,type,protocol);
             self.socket_dict[self.socket_count] = new_socket
             self.socket_count = self.socket_count + 1
-            print self.socket_dict
-            print self.socket_base+self.socket_count-1
-            return self.socket_base+self.socket_count-1
+            if self.debug:
+                print self.socket_dict
+            user_account=self.socket_base+self.socket_count-1
+            return user_account 
         except Exception,e:
             print e
             return -1
@@ -114,9 +117,14 @@ class SimpleConcoordServer():
 
     def sc_connect(self,socket_num):
         try:
+            if self.debug:
+                print "*"*10+"now we are connect"+"*"*10
             my_socket = self.socket_dict[socket_num-self.socket_base]
             my_socket.connect(("127.0.0.1",8080))
-            print "connect is called successfully"
+            if self.debug:
+                print socket_num
+                print "connect is called successfully"
+                print "*"*20
             return 0
         except Exception,e:
             print e
@@ -124,10 +132,15 @@ class SimpleConcoordServer():
 
     def sc_send(self,socket_num,data,flags):
         try:
+            if self.debug:
+                print "*"*10+"now we are send"+"*"*10
             my_socket = self.socket_dict[socket_num-self.socket_base]
             my_socket.send(data,flags)
-            print data
-            print "send is called successfully"
+            if self.debug:
+                print socket_num
+                print data
+                print "send is called successfully"
+                print "*"*20
             return len(data)
         except Exception,e:
             print e
@@ -136,11 +149,16 @@ class SimpleConcoordServer():
     #@timeout(60)
     def sc_recv(self,socket_num,buff_size,flags):
         try:
+            if self.debug:
+                print "*"*10+"now we are recv"+"*"*10
             my_socket = self.socket_dict[socket_num-self.socket_base]
             data = my_socket.recv(buff_size,flags)
-            print data
-            print "recv is called successfully"
-            return (0,data)
+            if self.debug:
+                print socket_num
+                print data
+                print "recv is called successfully"
+                print "*"*20
+            return (len(data),data)
         except Exception,e:
             print e
             return (-1,None);

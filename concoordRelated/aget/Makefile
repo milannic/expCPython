@@ -24,3 +24,4 @@ clean:
 	rm -rf *.out
 	rm -rf libpctern*
 	rm -rf $(target)
+	rm -rf *.log

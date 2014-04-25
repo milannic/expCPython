@@ -16,10 +16,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * Use LD_PRELOAD to intercept some important libc function calls for diagnosing x86 programs.
- */
-
 // alpha 0.1 version we implement socket -> connect -> send -> recv -> close 5 functions.
 // And we haven't handle the corresponding errno
 
@@ -38,16 +34,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <assert.h>
 #include <netinet/in.h>
-#include <sys/mman.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
-#include <time.h>
-#include <sys/time.h>
-#include <assert.h>
 #include <sys/socket.h> 
 #include <execinfo.h> 
 #include "Python.h" 
@@ -56,8 +46,14 @@
 #define PROJECT_TAG "PCTERN"
 #define RESOLVE(x)	if (!fp_##x && !(fp_##x = dlsym(RTLD_NEXT, #x))) { fprintf(stderr, #x"() not found!\n"); exit(-1); }
 #define MAXSIZE 1024
-#define DEBUG 1
 
+#ifndef LD_DEBUG
+#define LD_DEBUG 0
+#endif
+
+#ifndef PY_DEBUG
+#define PY_DEBUG 0
+#endif
 
 
 // this should be in a configuration file in the later time
@@ -109,7 +105,7 @@ int load_python_runtime(void){
         Py_Initialize();       
     }
     if(Py_IsInitialized()){
-#if DEBUG
+#if PY_DEBUG
         fprintf(stderr,"Python Runtime Have Been Initialized\n");
 #endif
         flag_python_runtime = 1;
@@ -131,34 +127,42 @@ int load_concoord_module(void){
     int ret=-1;
 
     pname = PyString_FromString(module_name);  
-    if(!pname)   
+    if(NULL==pname)   
     {  
+    #if PY_DEBUG
         fprintf(stderr,"can't build python string object\n");  
+    #endif
         goto load_module_error;  
     }  
 
     pmodule = PyImport_Import(pname);  
-    if(!pmodule)
+    if(NULL==pmodule)
     {  
+    #if PY_DEBUG
         fprintf(stderr,"can't find concoord module\n");  
+    #endif
         goto load_module_error;  
     }  
 
     pdict = PyModule_GetDict(pmodule);  
-    if(!pdict)           
+    if(NULL==pdict)           
     {  
+    #if PY_DEBUG
         fprintf(stderr,"can't get the dict of concoord module\n");  
+    #endif
         goto load_module_error;  
     }  
 
     pclass = PyDict_GetItemString(pdict, class_name);  
-    if(!pclass)           
+    if(NULL==pclass)           
     {  
+    #if PY_DEBUG
         fprintf(stderr,"can't find class SimpleConcoordServer\n");  
+    #endif
         goto load_module_error;  
     }  
 
-    #if DEBUG
+    #if PY_DEBUG
     if(PyClass_Check(pclass)){
         fprintf(stderr,"we have found the class\n");
     }
@@ -252,7 +256,7 @@ int create_ins(void){
     int ret = -1;
     PyObject *pargs=NULL;
 
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s\n",__FUNCTION__);
 #endif
 
@@ -264,32 +268,40 @@ int create_ins(void){
 
 	pargs = PyTuple_New(1);
     if(!pargs){
+#if PY_DEBUG
 		fprintf(stderr,"we cannot create the first tuple\n");  
+#endif
         goto create_ins_error;
     }
 
 
 	PyTuple_SetItem(pargs,0,Py_BuildValue("s",replica_group));
 
+#if PY_DEBUG
 	fprintf(stderr,"%p\n",pclass);  
+#endif
 
 	pins = PyInstance_New(pclass,pargs,NULL);
 
 	if(!pins){
+#if PY_DEBUG
 		fprintf(stderr,"we cannot create the instance\n");  
+#endif
         goto create_ins_error;
 	}
 	if(PyInstance_Check(pins)){
+#if PY_DEBUG
 		fprintf(stderr,"Sure, We have created an instance\n");  
+#endif
 	}else{
         goto create_ins_error;
     }
     ret = 0;
     goto create_ins_exit;
 create_ins_error:
-    if(NULL!=pargs){Py_DECREF(pargs);pargs=NULL;};
     if(NULL!=pins){Py_DECREF(pins);pins=NULL;};
 create_ins_exit:
+    if(NULL!=pargs){Py_DECREF(pargs);pargs=NULL;};
     return ret;
 }
 
@@ -308,29 +320,35 @@ void destory_ins(void){
 int sc_socket(int domain,int type,int protocol){
     int ret = -1;
     PyObject *pretval=NULL;  
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s\n",__FUNCTION__);
 #endif
     if(NULL==pins){
         if(-1==create_ins()){
         // we cannot create the instance then we cannot do the next
+#if PY_DEBUG
             fprintf(stderr,"we cannot create the ins\n");  
+#endif
             goto sc_socket_error;
         }
     }
      
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
 	pretval=PyObject_CallMethod(pins,"sc_socket","(i,i,i)",domain,type,protocol);
 	if(!pretval){
+#if PY_DEBUG
 		fprintf(stderr,"we cannot create the second tuple\n");  
+#endif
         goto sc_socket_error;
 	}
     ret = (int)PyInt_AsLong(pretval);
+#if PY_DEBUG
     fprintf(stderr,"we call the sc_socket method, and the return value is %d\n",ret);
-    goto sc_socket_exit;
+#endif
+    //goto sc_socket_exit;
 
 sc_socket_error:
     if(NULL!=pretval){Py_DECREF(pretval);};
@@ -342,7 +360,7 @@ sc_socket_exit:
 int sc_connect(int socket, const struct sockaddr *address, socklen_t address_len){
     int ret = -1;
     PyObject *pretval=NULL;  
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s\n",__FUNCTION__);
 #endif
     if(NULL==pins){
@@ -353,18 +371,22 @@ int sc_connect(int socket, const struct sockaddr *address, socklen_t address_len
         }
     }
      
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
 	pretval=PyObject_CallMethod(pins,"sc_connect","(i)",socket);
 	if(!pretval){
-		fprintf(stderr,"we cannot create the second tuple\n");  
+#if PY_DEBUG
+		fprintf(stderr,"%s runs improperly \n",__FUNCTION__);  
+#endif
         goto sc_connect_error;
 	}
     ret = (int)PyInt_AsLong(pretval);
+#if PY_DEBUG
     fprintf(stderr,"we call the sc_connect method, and the return value is %d\n",ret);
-    goto sc_connect_exit;
+#endif
+    //goto sc_connect_exit;
 
 sc_connect_error:
     if(NULL!=pretval){Py_DECREF(pretval);};
@@ -377,7 +399,7 @@ sc_connect_exit:
 ssize_t sc_send(int socket, const void *buffer, size_t length, int flags){
     ssize_t ret = -1;
     PyObject *pretval=NULL;  
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s\n",__FUNCTION__);
 #endif
     if(NULL==pins){
@@ -387,18 +409,22 @@ ssize_t sc_send(int socket, const void *buffer, size_t length, int flags){
             goto sc_send_error;
         }
     }
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
 	pretval=PyObject_CallMethod(pins,"sc_send","(i,s,i)",socket,buffer,flags);
 	if(!pretval){
-		fprintf(stderr,"we cannot create the second tuple\n");  
+#if PY_DEBUG
+		fprintf(stderr,"%s runs improperly \n",__FUNCTION__);  
+#endif
         goto sc_send_error;
 	}
     ret = (int)PyInt_AsLong(pretval);
+#if PY_DEBUG
     fprintf(stderr,"we call the sc_send method, and the return value is %d\n",ret);
-    goto sc_send_exit;
+#endif
+    //goto sc_send_exit;
 
 sc_send_error:
     if(NULL!=pretval){Py_DECREF(pretval);};
@@ -410,30 +436,60 @@ sc_send_exit:
 ssize_t sc_recv(int socket, const void *buffer, size_t length, int flags){
     ssize_t ret = -1;
     PyObject *pretval=NULL;  
-#if DEBUG
+    PyObject *pretcode=NULL;
+    PyObject *pretstring=NULL;
+
+#if PY_DEBUG
     fprintf(stderr,"I am here %s\n",__FUNCTION__);
 #endif
     if(NULL==pins){
         if(-1==create_ins()){
         // we cannot create the instance then we cannot do the next
+#if PY_DEBUG
             fprintf(stderr,"we cannot create the ins\n");  
+#endif
             goto sc_recv_error;
         }
     }
-#if DEBUG
+#if PY_DEBUG
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
 	pretval=PyObject_CallMethod(pins,"sc_recv","(i,i,i)",socket,length,flags);
-	if(!pretval){
-		fprintf(stderr,"we cannot create the second tuple\n");  
+	if(NULL==pretval){
+#if PY_DEBUG
+		fprintf(stderr,"%s runs improperly\n",__FUNCTION__);  
+#endif
         goto sc_recv_error;
 	}
+    // and PyTuple_GetItem returns borrowed reference, then we don't need to Py_DECREF them
+    pretcode = PyTuple_GetItem(pretval,0); 
+    if(NULL==pretcode){
+#if PY_DEBUG
+		fprintf(stderr,"%s return code error\n",__FUNCTION__);  
+#endif
+        goto sc_recv_error;
+    }
+    ret = (int)PyInt_AsLong(pretcode);
 
-    ret = (int)PyInt_AsLong(pretval);
-    fprintf(stderr,"we call the sc_recv method, and the return value is %s\n",ret);
-    goto sc_recv_exit;
-
+    if(-1!=ret){
+        pretstring = PyTuple_GetItem(pretval,1);
+        if(!pretstring){
+            fprintf(stderr,"%s return string error\n",__FUNCTION__);  
+            goto sc_recv_error;
+        }
+#if PY_DEBUG
+        fprintf(stderr,"we call the sc_recv method, and the return value is %s\n",PyString_AsString(pretstring));
+#endif
+        strcpy(buffer,PyString_AsString(pretstring));
+#if PY_DEBUG
+        fprintf(stderr,"we call the sc_recv method, and the return value is\n %s\n",buffer);
+    }
+    fprintf(stderr,"we call the sc_recv method, and the return value is %d\n",ret);
+#else
+    }
+#endif
+    //goto sc_recv_exit;
 sc_recv_error:
     if(NULL!=pretval){Py_DECREF(pretval);};
 sc_recv_exit:
@@ -445,18 +501,18 @@ static int (*fp_socket)(int domain, int type, int protocol);
 int socket(int domain, int type, int protocol){
 
     int ret =-1;
-#if DEBUG
+#if LD_DEBUG
     fprintf(stderr,"now check_sys() = %d \n",check_sys());
 #endif
     if(!check_sys()){
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the fake socket function\n");
 #endif
         enter_sys();
         ret = sc_socket(domain,type,protocol);
         leave_sys();
     }else{
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the real socket function\n");
 #endif
         RESOLVE(socket);
@@ -471,18 +527,18 @@ int socket(int domain, int type, int protocol){
 static int (*fp_connect)(int socket, const struct sockaddr *address, socklen_t address_len);
 int connect(int socket, const struct sockaddr *address, socklen_t address_len){
     int ret =-1;
-#if DEBUG
+#if LD_DEBUG
     fprintf(stderr,"now check_sys() = %d \n",check_sys());
 #endif
     if(!check_sys()){
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
 #endif
         enter_sys();
         ret = sc_connect(socket,address,address_len);
         leave_sys();
     }else{
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
 #endif
         RESOLVE(connect);
@@ -497,18 +553,18 @@ int connect(int socket, const struct sockaddr *address, socklen_t address_len){
 static ssize_t (*fp_send)(int socket, const void *buffer, size_t length, int flags);
 ssize_t send(int socket, const void *buffer, size_t length, int flags){
     ssize_t ret =-1;
-#if DEBUG
+#if LD_DEBUG
     fprintf(stderr,"now check_sys() = %d \n",check_sys());
 #endif
     if(!check_sys()){
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
 #endif
         enter_sys();
         ret = sc_send(socket,buffer,length,flags);
         leave_sys();
     }else{
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
 #endif
         RESOLVE(send);
@@ -523,18 +579,18 @@ ssize_t send(int socket, const void *buffer, size_t length, int flags){
 static ssize_t (*fp_recv)(int socket, void *buffer, size_t length, int flags);
 ssize_t recv(int socket, void *buffer, size_t length, int flags) {
     ssize_t ret =-1;
-#if DEBUG
+#if LD_DEBUG
     fprintf(stderr,"now check_sys() = %d \n",check_sys());
 #endif
     if(!check_sys()){
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
 #endif
         enter_sys();
         ret = sc_recv(socket,buffer,length,flags);
         leave_sys();
     }else{
-#if DEBUG
+#if LD_DEBUG
         fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
 #endif
         RESOLVE(recv);
@@ -543,6 +599,7 @@ ssize_t recv(int socket, void *buffer, size_t length, int flags) {
 //   errno = 22;
      return ret;
 }
+
 
 #if 0
 //close
