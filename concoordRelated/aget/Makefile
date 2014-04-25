@@ -6,11 +6,11 @@ target = libpctern.so.1.0 \
 
 all:$(target)
 
-libpctern.so.1.0:pctern.o
-	$(CC) $< -Wl,-soname,libpctern.so.1 -rdynamic -shared -fpic -o $@ $(LDFLAGS) 
+libpctern.so.1.0:pctern.o enter_sys.o
+	$(CC) $^ -Wl,-soname,libpctern.so.1 -rdynamic -shared -fpic -o $@ $(LDFLAGS) 
 
-pctern.o:pctern.c
-	$(CC) $(CFLAGS) -fpic -g -c -o $@ $<
+.c.o:
+	$(CC) $(CFLAGS) -fpic -g -c -o $@ $^
 
 
 .PHONY: clean link
