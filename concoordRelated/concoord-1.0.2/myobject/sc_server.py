@@ -116,6 +116,7 @@ class SimpleConcoordServer():
         try:
             my_socket = self.socket_dict[socket_num-self.socket_base]
             my_socket.connect(("127.0.0.1",8080))
+            print "connect is called successfully"
             return 0
         except Exception,e:
             print e
@@ -126,6 +127,7 @@ class SimpleConcoordServer():
             my_socket = self.socket_dict[socket_num-self.socket_base]
             my_socket.send(data,flags)
             print data
+            print "send is called successfully"
             return len(data)
         except Exception,e:
             print e
@@ -137,10 +139,11 @@ class SimpleConcoordServer():
             my_socket = self.socket_dict[socket_num-self.socket_base]
             data = my_socket.recv(buff_size,flags)
             print data
-            return data
+            print "recv is called successfully"
+            return (0,data)
         except Exception,e:
             print e
-            return -1;
+            return (-1,None);
 
     def sc_close(self,socket_num):
         try:

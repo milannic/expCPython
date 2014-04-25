@@ -339,7 +339,106 @@ sc_socket_exit:
 }
 
 
+int sc_connect(int socket, const struct sockaddr *address, socklen_t address_len){
+    int ret = -1;
+    PyObject *pretval=NULL;  
+#if DEBUG
+    fprintf(stderr,"I am here %s\n",__FUNCTION__);
+#endif
+    if(NULL==pins){
+        if(-1==create_ins()){
+        // we cannot create the instance then we cannot do the next
+            fprintf(stderr,"we cannot create the ins\n");  
+            goto sc_connect_error;
+        }
+    }
+     
+#if DEBUG
+    fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
+    fprintf(stderr,"%p\n",pins);
+#endif
+	pretval=PyObject_CallMethod(pins,"sc_connect","(i)",socket);
+	if(!pretval){
+		fprintf(stderr,"we cannot create the second tuple\n");  
+        goto sc_connect_error;
+	}
+    ret = (int)PyInt_AsLong(pretval);
+    fprintf(stderr,"we call the sc_connect method, and the return value is %d\n",ret);
+    goto sc_connect_exit;
 
+sc_connect_error:
+    if(NULL!=pretval){Py_DECREF(pretval);};
+sc_connect_exit:
+    return ret;
+}
+
+
+
+ssize_t sc_send(int socket, const void *buffer, size_t length, int flags){
+    ssize_t ret = -1;
+    PyObject *pretval=NULL;  
+#if DEBUG
+    fprintf(stderr,"I am here %s\n",__FUNCTION__);
+#endif
+    if(NULL==pins){
+        if(-1==create_ins()){
+        // we cannot create the instance then we cannot do the next
+            fprintf(stderr,"we cannot create the ins\n");  
+            goto sc_send_error;
+        }
+    }
+#if DEBUG
+    fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
+    fprintf(stderr,"%p\n",pins);
+#endif
+	pretval=PyObject_CallMethod(pins,"sc_send","(i,s,i)",socket,buffer,flags);
+	if(!pretval){
+		fprintf(stderr,"we cannot create the second tuple\n");  
+        goto sc_send_error;
+	}
+    ret = (int)PyInt_AsLong(pretval);
+    fprintf(stderr,"we call the sc_send method, and the return value is %d\n",ret);
+    goto sc_send_exit;
+
+sc_send_error:
+    if(NULL!=pretval){Py_DECREF(pretval);};
+sc_send_exit:
+    return ret;
+}
+
+
+ssize_t sc_recv(int socket, const void *buffer, size_t length, int flags){
+    ssize_t ret = -1;
+    PyObject *pretval=NULL;  
+#if DEBUG
+    fprintf(stderr,"I am here %s\n",__FUNCTION__);
+#endif
+    if(NULL==pins){
+        if(-1==create_ins()){
+        // we cannot create the instance then we cannot do the next
+            fprintf(stderr,"we cannot create the ins\n");  
+            goto sc_recv_error;
+        }
+    }
+#if DEBUG
+    fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
+    fprintf(stderr,"%p\n",pins);
+#endif
+	pretval=PyObject_CallMethod(pins,"sc_recv","(i,i,i)",socket,length,flags);
+	if(!pretval){
+		fprintf(stderr,"we cannot create the second tuple\n");  
+        goto sc_recv_error;
+	}
+
+    ret = (int)PyInt_AsLong(pretval);
+    fprintf(stderr,"we call the sc_recv method, and the return value is %s\n",ret);
+    goto sc_recv_exit;
+
+sc_recv_error:
+    if(NULL!=pretval){Py_DECREF(pretval);};
+sc_recv_exit:
+    return ret;
+}
 
 // for this function actually we 
 static int (*fp_socket)(int domain, int type, int protocol);
@@ -369,35 +468,83 @@ int socket(int domain, int type, int protocol){
 
 
 //connect
-//
-#if 0
 static int (*fp_connect)(int socket, const struct sockaddr *address, socklen_t address_len);
 int connect(int socket, const struct sockaddr *address, socklen_t address_len){
-  struct sockaddr_in* in_address=(struct sockaddr_in*)address;
-  fprintf(stderr,"socket : %d , port : %u , addr : %u , socklen : %d \n",socket,in_address->sin_port,in_address->sin_addr.s_addr,(int)address_len);
-  fprintf(stderr,"the address length is %lu\n",sizeof(in_address->sin_addr.s_addr));
-  int ret = fp_connect(socket,address,address_len);
-  return ret;
+    int ret =-1;
+#if DEBUG
+    fprintf(stderr,"now check_sys() = %d \n",check_sys());
+#endif
+    if(!check_sys()){
+#if DEBUG
+        fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
+#endif
+        enter_sys();
+        ret = sc_connect(socket,address,address_len);
+        leave_sys();
+    }else{
+#if DEBUG
+        fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
+#endif
+        RESOLVE(connect);
+        ret = fp_connect(socket,address,address_len);
+    }
+//   errno = 22;
+     return ret;
 }
 
 
 
 static ssize_t (*fp_send)(int socket, const void *buffer, size_t length, int flags);
-
 ssize_t send(int socket, const void *buffer, size_t length, int flags){
-    ssize_t ret=0;
-  fprintf(stderr,"socket : %d , content : %s , length : %d \n",socket,(char*)buffer,(int)length);
-  //ssize_t ret = fp_send(socket, buffer, length, flags);
-  return ret;
+    ssize_t ret =-1;
+#if DEBUG
+    fprintf(stderr,"now check_sys() = %d \n",check_sys());
+#endif
+    if(!check_sys()){
+#if DEBUG
+        fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
+#endif
+        enter_sys();
+        ret = sc_send(socket,buffer,length,flags);
+        leave_sys();
+    }else{
+#if DEBUG
+        fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
+#endif
+        RESOLVE(send);
+        ret = fp_send(socket,buffer,length,flags);
+    }
+//   errno = 22;
+     return ret;
 };
 
 
-static int (*fp_recv)(int socket, void *buffer, size_t length, int flags);
+
+static ssize_t (*fp_recv)(int socket, void *buffer, size_t length, int flags);
 ssize_t recv(int socket, void *buffer, size_t length, int flags) {
-  int ret = fp_recv(socket, buffer, length, flags);
-  return ret;
+    ssize_t ret =-1;
+#if DEBUG
+    fprintf(stderr,"now check_sys() = %d \n",check_sys());
+#endif
+    if(!check_sys()){
+#if DEBUG
+        fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
+#endif
+        enter_sys();
+        ret = sc_recv(socket,buffer,length,flags);
+        leave_sys();
+    }else{
+#if DEBUG
+        fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
+#endif
+        RESOLVE(recv);
+        ret = fp_recv(socket,buffer,length,flags);
+    }
+//   errno = 22;
+     return ret;
 }
 
+#if 0
 //close
 static int (*fp_close)(int fd);
 int close(int fd) {
