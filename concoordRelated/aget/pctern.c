@@ -48,16 +48,15 @@
 #include <time.h>
 #include <sys/time.h>
 #include <assert.h>
-#include <sys/socket.h>
-#include <execinfo.h>
-#include "Python.h"
+#include <sys/socket.h> 
+#include <execinfo.h> 
+#include "Python.h" 
 #include "enter_sys.h"
 
 #define PROJECT_TAG "PCTERN"
 #define RESOLVE(x)	if (!fp_##x && !(fp_##x = dlsym(RTLD_NEXT, #x))) { fprintf(stderr, #x"() not found!\n"); exit(-1); }
 #define MAXSIZE 1024
 #define DEBUG 1
-#define MAXSOCKET 64
 
 
 
@@ -66,28 +65,26 @@ static char* module_name = "sc_serverproxy";
 static char* class_name = "SimpleConcoordServer";
 static char* replica_group = "127.0.0.1:14001";
 
-// with embedded python, we must carefully check every PyObject's reference to keep python runtime work correctly,then we maintain each of them of a int flag
-
-// and this should be replace by a more elegant way.
-static PyObject *pscoket_pool[MAXSOCKET] = {NULL};
+// with embedded python, we must carefully check every PyObject's reference to keep python runtime work correctly
 
 static PyObject *pname=NULL,*pmodule=NULL,*pdict=NULL,*pclass=NULL;
-static int flag_pname = 0,flag_pmodule=0,flag_pdict=0,flag_pclass=0;
 
-static int flag_python_runtime = 0;
-static int flag_concoord_module = 0;
-static int ready=0;
-
-// to maintain a python
-
+static volatile int flag_python_runtime = 0;
+static volatile int flag_concoord_module = 0;
+static volatile int ready=0;
+// to maintain a python 
 // each thread has its only copy, so we don't need to worry about the synchronous issues
-static __thread int entered = 0; 
-//static __thread PyObject *pins=NULL;
 
-static pthread_mutex_t lock;
+static __thread PyObject *pins=NULL;
+
+static pthread_mutex_t init_lock;
+static pthread_mutex_t check_lock;
 
 // initialize the python runtime for each thread, as for the finalize, 
 // it should be done in the exit signal handler of the program.
+//
+static int check_ready(void);
+static int check_and_set_ready(void);
 
 static int init_python(void);
 static void final_python(void);
@@ -97,6 +94,14 @@ static void unload_python_runtime(void);
 
 static int load_concoord_module(void);
 static void unload_concoord_module(void);
+
+static int create_ins(void);
+static void destory_ins(void);
+
+//non static area
+int sc_socket(int domain,int type,int protocol);
+
+
 
 //init the python runtime 
 int load_python_runtime(void){
@@ -131,7 +136,6 @@ int load_concoord_module(void){
         fprintf(stderr,"can't build python string object\n");  
         goto load_module_error;  
     }  
-    flag_pname = 1;
 
     pmodule = PyImport_Import(pname);  
     if(!pmodule)
@@ -139,7 +143,6 @@ int load_concoord_module(void){
         fprintf(stderr,"can't find concoord module\n");  
         goto load_module_error;  
     }  
-    flag_pmodule = 1;
 
     pdict = PyModule_GetDict(pmodule);  
     if(!pdict)           
@@ -147,15 +150,13 @@ int load_concoord_module(void){
         fprintf(stderr,"can't get the dict of concoord module\n");  
         goto load_module_error;  
     }  
-    flag_pdict = 1; 
 
-    pclass = PyDict_GetItemString(pdict, "SimpleConcoordServer");  
+    pclass = PyDict_GetItemString(pdict, class_name);  
     if(!pclass)           
     {  
         fprintf(stderr,"can't find class SimpleConcoordServer\n");  
         goto load_module_error;  
     }  
-    flag_pclass = 1;
 
     #if DEBUG
     if(PyClass_Check(pclass)){
@@ -168,27 +169,27 @@ int load_concoord_module(void){
     goto load_module_exit;
 
 load_module_error:
-    if(flag_pname)Py_DECREF(pname);
-    if(flag_pmodule)Py_DECREF(pmodule);
-    if(flag_pdict)Py_DECREF(pdict);
-    if(flag_pclass)Py_DECREF(pclass);
+    if(NULL!=pname){Py_DECREF(pname);pname=NULL;}
+    if(NULL!=pmodule){Py_DECREF(pmodule);pmodule=NULL;}
+    if(NULL!=pdict){Py_DECREF(pdict);pdict=NULL;}
+    if(NULL!=pclass){Py_DECREF(pclass);pclass=NULL;}
 load_module_exit:
     return ret;
 }
 
 void unload_concoord_module(void){
     if(flag_concoord_module){
-        if(flag_pname)Py_DECREF(pname);
-        if(flag_pmodule)Py_DECREF(pmodule);
-        if(flag_pdict)Py_DECREF(pdict);
-        if(flag_pclass)Py_DECREF(pclass);
+        if(NULL!=pname){Py_DECREF(pname);pname=NULL;}
+        if(NULL!=pmodule){Py_DECREF(pmodule);pmodule=NULL;}
+        if(NULL!=pdict){Py_DECREF(pdict);pdict=NULL;}
+        if(NULL!=pclass){Py_DECREF(pclass);pclass=NULL;}
         flag_concoord_module = 0;
     }
 }
 
 int init_python(void){
     int ret=-1;
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&init_lock);
     if(!flag_python_runtime){
         if(-1==load_python_runtime()){
             goto init_exit;
@@ -202,83 +203,139 @@ int init_python(void){
     ret = 0;
     ready = 1;
 init_exit:
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&init_lock);
     return ret;
 }
 
 void final_python(void){
-    pthread_mutex_lock(&lock);
-    if(flag_concoord_module){
-        unload_concoord_module();
+    pthread_mutex_lock(&init_lock);
+    if(ready==1){
+        if(flag_concoord_module){
+            unload_concoord_module();
+        }
+        if(flag_python_runtime){
+            unload_python_runtime();
+        }
+        ready = 0;
     }
-    if(flag_python_runtime){
-        unload_python_runtime();
-    }
-    ready = 0;
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&init_lock);
 }
+
+
+int check_ready(void){
+    int ret;
+    pthread_mutex_lock(&check_lock);
+    ret = ready;
+    pthread_mutex_unlock(&check_lock);
+    return ret;
+}
+
+
+
+int check_and_set_ready(void){
+    int ret;
+    pthread_mutex_lock(&check_lock);
+    ret = ready;
+    if(ret==0){
+        if(!init_python()){
+            ret = 1;
+        }
+    }
+    pthread_mutex_unlock(&check_lock);
+    return ret;
+}
+
+
+//for now we don't know whether creating python class instance will do write to the class object, then no mutex used, we will check this in detail in the later time
+//
+int create_ins(void){
+    int ret = -1;
+    PyObject *pargs=NULL;
+
+#if DEBUG
+    fprintf(stderr,"I am here %s\n",__FUNCTION__);
+#endif
+
+    if(!check_ready()){
+        if(!check_and_set_ready()){
+            goto create_ins_error;
+        }
+    }
+
+	pargs = PyTuple_New(1);
+    if(!pargs){
+		fprintf(stderr,"we cannot create the first tuple\n");  
+        goto create_ins_error;
+    }
+
+
+	PyTuple_SetItem(pargs,0,Py_BuildValue("s",replica_group));
+
+	fprintf(stderr,"%p\n",pclass);  
+
+	pins = PyInstance_New(pclass,pargs,NULL);
+
+	if(!pins){
+		fprintf(stderr,"we cannot create the instance\n");  
+        goto create_ins_error;
+	}
+	if(PyInstance_Check(pins)){
+		fprintf(stderr,"Sure, We have created an instance\n");  
+	}else{
+        goto create_ins_error;
+    }
+    ret = 0;
+    goto create_ins_exit;
+create_ins_error:
+    if(NULL!=pargs){Py_DECREF(pargs);pargs=NULL;};
+    if(NULL!=pins){Py_DECREF(pins);pins=NULL;};
+create_ins_exit:
+    return ret;
+}
+
+
+void destory_ins(void){
+    if(NULL!=pins){
+        Py_DECREF(pins);
+        pins=NULL;
+    }
+}
+
+
+
 
 
 int sc_socket(int domain,int type,int protocol){
     int ret = -1;
-    PyObject *pargs1=NULL,*pargs2=NULL,*pretval=NULL,*pins=NULL;  
-    int flag_pargs1=0,flag_pargs2=0,flag_pretval=0,flag_pins=0;  
-
-    if(!ready){
-        if(-1==init_python()){
+    PyObject *pretval=NULL;  
+#if DEBUG
+    fprintf(stderr,"I am here %s\n",__FUNCTION__);
+#endif
+    if(NULL==pins){
+        if(-1==create_ins()){
+        // we cannot create the instance then we cannot do the next
+            fprintf(stderr,"we cannot create the ins\n");  
             goto sc_socket_error;
         }
     }
-
-	pargs1 = PyTuple_New(1);
-    if(!pargs1){
-		fprintf(stderr,"we cannot create the first tuple\n");  
-        goto sc_socket_error;
-    }
-    flag_pargs1=1;
-	PyTuple_SetItem(pargs1,0,Py_BuildValue("s",replica_group));
-	fprintf(stderr,"%p\n",pclass);  
-
-	pins = PyInstance_New(pclass,pargs1,NULL);
-
-	if(!pins){
-		fprintf(stderr,"we cannot create the instance\n");  
-        goto sc_socket_error;
-	}
-    flag_pins=1;
-	sleep(2);
-    
+     
 #if DEBUG
-	if(PyInstance_Check(pins)){
-		fprintf(stderr,"Sure, We have created an instance\n");  
-	}
+    fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
+    fprintf(stderr,"%p\n",pins);
 #endif
-
-//	pargs2 = Py_BuildValue("(i,i,i)",domain,type,protocol);
-//    if(!pargs2){
-//		fprintf(stderr,"we cannot create the first tuple\n");  
-//        goto sc_socket_error;
-//    }
-//    flag_pargs2=1;
-
 	pretval=PyObject_CallMethod(pins,"sc_socket","(i,i,i)",domain,type,protocol);
-
 	if(!pretval){
 		fprintf(stderr,"we cannot create the second tuple\n");  
         goto sc_socket_error;
 	}
-
-    flag_pretval=1;
     ret = (int)PyInt_AsLong(pretval);
     fprintf(stderr,"we call the sc_socket method, and the return value is %d\n",ret);
+    goto sc_socket_exit;
 
 sc_socket_error:
-    if(flag_pins)Py_DECREF(pins);
+    if(NULL!=pretval){Py_DECREF(pretval);};
 sc_socket_exit:
-    if(flag_pargs1)Py_DECREF(pargs1);
-    if(flag_pargs2)Py_DECREF(pargs2);
-    if(flag_pretval)Py_DECREF(pretval);
-    return -1;
+    return ret;
 }
 
 
@@ -287,6 +344,7 @@ sc_socket_exit:
 // for this function actually we 
 static int (*fp_socket)(int domain, int type, int protocol);
 int socket(int domain, int type, int protocol){
+
     int ret =-1;
 #if DEBUG
     fprintf(stderr,"now check_sys() = %d \n",check_sys());
@@ -304,26 +362,9 @@ int socket(int domain, int type, int protocol){
 #endif
         RESOLVE(socket);
         ret = fp_socket(domain,type,protocol);
-        return ret;
     }
-    // we enter the sys area avoiding intercept other system call
-#if 0
-    enter_sys();
-    if(check_sys()){
-        fprintf(stderr,"now we have entered the sys\n");
-    }else{
-        fprintf(stderr,"now we have not entered the sys\n");
-    }
-    leave_sys();
-    if(check_sys()){
-        fprintf(stderr,"now we have entered the sys\n");
-    }else{
-        fprintf(stderr,"now we have not entered the sys\n");
-    }
-#endif
 //   errno = 22;
-socket_exit:
-    return -1;
+     return ret;
 }
 
 
