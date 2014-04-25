@@ -21,7 +21,7 @@ class SimpleConcoordServer():
     def __init__(self):
         self.running = 0
         #default parameter
-        self.bin_args = ["/home/milannic/expCPython/concoordRelated/mongoose/mongoose"]
+        self.bin_args = ["/home/milannic/expCPython/concoordRelated/mongoose/mongoose","-t 2"]
         #default path
         self.socket_base = 10000
         self.socket_count = 0
@@ -46,9 +46,9 @@ class SimpleConcoordServer():
                 if len(self.bin_args) > 1:
                     args=self.bin_args[1:]
                 else:
-                    args = None
+                    args = [""]
                 if not self.cpid:
-                    os.execv(self.bin_args[0],["-t 2"])
+                    os.execv(self.bin_args[0],args)
                 print self.cpid
                 try:
                     os.kill(int(self.cpid), 0)

@@ -30,21 +30,22 @@
 #endif     /* ----- #if 0 : If0Label_2 ----- */
 
 #include <assert.h>
+#include "enter_sys.h"
 
-static __thread int enter_sys=0;
+static __thread int enter_sys_var=0;
 
-int checkSys(void){
-    return enter_sys;
+int check_sys(void){
+    return enter_sys_var;
 }
 
-void enterSys(void){
-    assert(enter_sys==0&&"Operation Is Not In The Sys Fields");
-    enter_sys = 1;
+void enter_sys(void){
+    assert(enter_sys_var==0&&"Operation Is Not In The Sys Fields");
+    enter_sys_var = 1;
 }
 
-void leaveSys(void){
-    assert(enter_sys==1&&"Operation Is Not In The Sys Fields");
-    enter_sys = 0;
+void leave_sys(void){
+    assert(enter_sys_var==1&&"Operation Is Not In The Sys Fields");
+    enter_sys_var = 0;
 }
 
 
