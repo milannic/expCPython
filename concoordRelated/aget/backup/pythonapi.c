@@ -38,7 +38,6 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <sys/socket.h> 
-#include <pthread.h>
 #include <execinfo.h> 
 #include "Python.h" 
 #include "pythonapi.h"
@@ -63,22 +62,21 @@ static char* replica_group = "127.0.0.1:14001";
 
 // with embedded python, we must carefully check every PyObject's reference to keep python runtime work correctly
 
-static PyObject *pname=NULL;
-static PyObject *pmodule=NULL;
-static PyObject *pdict=NULL;
-static PyObject *pclass=NULL;
+static __thread PyObject *pname=NULL;
+static __thread PyObject *pmodule=NULL;
+static __thread PyObject *pdict=NULL;
+static __thread PyObject *pclass=NULL;
 
-static volatile int flag_python_runtime = 0;
-static volatile int flag_concoord_module = 0;
-static volatile int ready=0;
+static __thread volatile int flag_python_runtime = 0;
+static __thread volatile int flag_concoord_module = 0;
+static __thread volatile int ready=0;
 // to maintain a python 
 // each thread has its only copy, so we don't need to worry about the synchronous issues
 
 static __thread PyObject *pins=NULL;
 
-static pthread_mutex_t init_lock;
-static pthread_mutex_t check_lock;
-static pthread_spinlock_t spin_lock;
+//static pthread_mutex_t init_lock;
+//static pthread_mutex_t check_lock;
 
 // initialize the python runtime for each thread, as for the finalize, 
 // it should be done in the exit signal handler of the program.
@@ -199,7 +197,7 @@ void unload_concoord_module(void){
 
 int init_python(void){
     int ret=-1;
-    pthread_mutex_lock(&init_lock);
+    //pthread_mutex_lock(&init_lock);
     if(!flag_python_runtime){
         if(-1==load_python_runtime()){
             goto init_exit;
@@ -212,14 +210,13 @@ int init_python(void){
     }
     ret = 0;
     ready = 1;
-    pthread_spin_init(&spin_lock,PTHREAD_PROCESS_SHARED);
 init_exit:
-    pthread_mutex_unlock(&init_lock);
+    //pthread_mutex_unlock(&init_lock);
     return ret;
 }
 
 void final_python(void){
-    pthread_mutex_lock(&init_lock);
+    //pthread_mutex_lock(&init_lock);
     if(ready==1){
         if(flag_concoord_module){
             unload_concoord_module();
@@ -229,36 +226,30 @@ void final_python(void){
         }
         ready = 0;
     }
-    pthread_mutex_unlock(&init_lock);
+    //pthread_mutex_unlock(&init_lock);
 }
 
 
 int check_ready(void){
     int ret;
-    pthread_mutex_lock(&check_lock);
+    //pthread_mutex_lock(&check_lock);
     ret = ready;
-    pthread_mutex_unlock(&check_lock);
+    //pthread_mutex_unlock(&check_lock);
     return ret;
 }
 
 
 
 int check_and_set_ready(void){
-#if PY_DEBUG
-    fprintf(stderr,"I am here %s\n",__FUNCTION__);
-#endif
     int ret;
-    pthread_mutex_lock(&check_lock);
+    //pthread_mutex_lock(&check_lock);
     ret = ready;
     if(ret==0){
         if(!init_python()){
             ret = 1;
         }
     }
-    pthread_mutex_unlock(&check_lock);
-#if PY_DEBUG
-    fprintf(stderr,"I leaving here %s\n",__FUNCTION__);
-#endif
+    //pthread_mutex_unlock(&check_lock);
     return ret;
 }
 
@@ -279,18 +270,7 @@ int create_ins(void){
         }
     }
 
-#if PY_DEBUG
-    fprintf(stderr,"I am here to get spinlock %s\n",__FUNCTION__);
-#endif
-    pthread_spin_lock(&spin_lock);
-#if PY_DEBUG
-    fprintf(stderr,"I have got the spinlock %s\n",__FUNCTION__);
-#endif
 	pargs = PyTuple_New(1);
-    pthread_spin_unlock(&spin_lock);
-#if PY_DEBUG
-    fprintf(stderr,"I am releasing the spinlock %s\n",__FUNCTION__);
-#endif
     if(!pargs){
 #if PY_DEBUG
 		fprintf(stderr,"we cannot create the first tuple\n");  
@@ -299,41 +279,41 @@ int create_ins(void){
     }
 
 
-    pthread_spin_lock(&spin_lock);
 	PyTuple_SetItem(pargs,0,Py_BuildValue("s",replica_group));
-    pthread_spin_unlock(&spin_lock);
 
 #if PY_DEBUG
 	fprintf(stderr,"%p\n",pclass);  
 #endif
-     
-    pthread_spin_lock(&spin_lock);
-#if PY_DEBUG
-		fprintf(stderr,"we are creating the instance here\n");  
-#endif
+
 	pins = PyInstance_New(pclass,pargs,NULL);
-    pthread_spin_unlock(&spin_lock);
 
 	if(!pins){
+#if PY_DEBUG
 		fprintf(stderr,"we cannot create the instance\n");  
+#endif
         goto create_ins_error;
 	}
-
+	if(PyInstance_Check(pins)){
+#if PY_DEBUG
+		fprintf(stderr,"Sure, We have created an instance\n");  
+#endif
+	}else{
+        goto create_ins_error;
+    }
     ret = 0;
+    goto create_ins_exit;
 create_ins_error:
-    pthread_spin_lock(&spin_lock);
+    if(NULL!=pins){Py_DECREF(pins);pins=NULL;};
+create_ins_exit:
     if(NULL!=pargs){Py_DECREF(pargs);pargs=NULL;};
-    pthread_spin_unlock(&spin_lock);
     return ret;
 }
 
 
 void destory_ins(void){
     if(NULL!=pins){
-        pthread_spin_lock(&spin_lock);
         Py_DECREF(pins);
         pins=NULL;
-        pthread_spin_unlock(&spin_lock);
     }
 }
 
@@ -361,29 +341,21 @@ int sc_socket(int domain,int type,int protocol){
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
-
-    pthread_spin_lock(&spin_lock);
 	pretval=PyObject_CallMethod(pins,"sc_socket","(i,i,i)",domain,type,protocol);
-    pthread_spin_unlock(&spin_lock);
-
 	if(!pretval){
 #if PY_DEBUG
 		fprintf(stderr,"we cannot create the second tuple\n");  
 #endif
         goto sc_socket_error;
 	}
-    pthread_spin_lock(&spin_lock);
     ret = (int)PyInt_AsLong(pretval);
-    pthread_spin_unlock(&spin_lock);
 #if PY_DEBUG
     fprintf(stderr,"we call the sc_socket method, and the return value is %d\n",ret);
 #endif
     //goto sc_socket_exit;
 
 sc_socket_error:
-    pthread_spin_lock(&spin_lock);
     if(NULL!=pretval){Py_DECREF(pretval);};
-    pthread_spin_unlock(&spin_lock);
 sc_socket_exit:
     return ret;
 }
@@ -407,27 +379,21 @@ int sc_connect(int socket, const struct sockaddr *address, socklen_t address_len
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
-    pthread_spin_lock(&spin_lock);
 	pretval=PyObject_CallMethod(pins,"sc_connect","(i)",socket);
-    pthread_spin_unlock(&spin_lock);
 	if(!pretval){
 #if PY_DEBUG
 		fprintf(stderr,"%s runs improperly \n",__FUNCTION__);  
 #endif
         goto sc_connect_error;
 	}
-    pthread_spin_lock(&spin_lock);
     ret = (int)PyInt_AsLong(pretval);
-    pthread_spin_unlock(&spin_lock);
 #if PY_DEBUG
     fprintf(stderr,"we call the sc_connect method, and the return value is %d\n",ret);
 #endif
     //goto sc_connect_exit;
 
 sc_connect_error:
-    pthread_spin_lock(&spin_lock);
     if(NULL!=pretval){Py_DECREF(pretval);};
-    pthread_spin_unlock(&spin_lock);
 sc_connect_exit:
     return ret;
 }
@@ -451,27 +417,21 @@ ssize_t sc_send(int socket, const void *buffer, size_t length, int flags){
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
-    pthread_spin_lock(&spin_lock);
 	pretval=PyObject_CallMethod(pins,"sc_send","(i,s,i)",socket,buffer,flags);
-    pthread_spin_unlock(&spin_lock);
 	if(!pretval){
 #if PY_DEBUG
 		fprintf(stderr,"%s runs improperly \n",__FUNCTION__);  
 #endif
         goto sc_send_error;
 	}
-    pthread_spin_lock(&spin_lock);
     ret = (int)PyInt_AsLong(pretval);
-    pthread_spin_unlock(&spin_lock);
 #if PY_DEBUG
     fprintf(stderr,"we call the sc_send method, and the return value is %d\n",ret);
 #endif
     //goto sc_send_exit;
 
 sc_send_error:
-    pthread_spin_lock(&spin_lock);
     if(NULL!=pretval){Py_DECREF(pretval);};
-    pthread_spin_unlock(&spin_lock);
 sc_send_exit:
     return ret;
 }
@@ -499,9 +459,7 @@ ssize_t sc_recv(int socket, const void *buffer, size_t length, int flags){
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
-    pthread_spin_lock(&spin_lock);
 	pretval=PyObject_CallMethod(pins,"sc_recv","(i,i,i)",socket,length,flags);
-    pthread_spin_unlock(&spin_lock);
 	if(NULL==pretval){
 #if PY_DEBUG
 		fprintf(stderr,"%s runs improperly\n",__FUNCTION__);  
@@ -509,33 +467,25 @@ ssize_t sc_recv(int socket, const void *buffer, size_t length, int flags){
         goto sc_recv_error;
 	}
     // and PyTuple_GetItem returns borrowed reference, then we don't need to Py_DECREF them
-    pthread_spin_lock(&spin_lock);
     pretcode = PyTuple_GetItem(pretval,0); 
-    pthread_spin_unlock(&spin_lock);
     if(NULL==pretcode){
 #if PY_DEBUG
 		fprintf(stderr,"%s return code error\n",__FUNCTION__);  
 #endif
         goto sc_recv_error;
     }
-    pthread_spin_lock(&spin_lock);
     ret = (int)PyInt_AsLong(pretcode);
-    pthread_spin_unlock(&spin_lock);
 
     if(-1!=ret){
-        pthread_spin_lock(&spin_lock);
         pretstring = PyTuple_GetItem(pretval,1);
-        pthread_spin_unlock(&spin_lock);
-        if(NULL==pretstring){
+        if(!pretstring){
             fprintf(stderr,"%s return string error\n",__FUNCTION__);  
             goto sc_recv_error;
         }
 #if PY_DEBUG
         fprintf(stderr,"we call the sc_recv method, and the return value is %s\n",PyString_AsString(pretstring));
 #endif
-        pthread_spin_lock(&spin_lock);
         strcpy((char*)buffer,PyString_AsString(pretstring));
-        pthread_spin_unlock(&spin_lock);
 #if PY_DEBUG
         fprintf(stderr,"we call the sc_recv method, and the return value is\n %s\n",buffer);
     }
@@ -545,11 +495,7 @@ ssize_t sc_recv(int socket, const void *buffer, size_t length, int flags){
 #endif
     //goto sc_recv_exit;
 sc_recv_error:
-    pthread_spin_lock(&spin_lock);
     if(NULL!=pretval){Py_DECREF(pretval);};
-    if(NULL!=pretcode){Py_DECREF(pretcode);};
-    if(NULL!=pretstring){Py_DECREF(pretstring);};
-    pthread_spin_unlock(&spin_lock);
 sc_recv_exit:
     return ret;
 }
@@ -572,27 +518,21 @@ int sc_close(int fd){
     fprintf(stderr,"I am here %s 2\n",__FUNCTION__);
     fprintf(stderr,"%p\n",pins);
 #endif
-    pthread_spin_lock(&spin_lock);
 	pretval=PyObject_CallMethod(pins,"sc_close","(i)",fd);
-    pthread_spin_unlock(&spin_lock);
 	if(!pretval){
 #if PY_DEBUG
 		fprintf(stderr,"%s runs improperly \n",__FUNCTION__);  
 #endif
         goto sc_close_error;
 	}
-    pthread_spin_lock(&spin_lock);
     ret = (int)PyInt_AsLong(pretval);
-    pthread_spin_unlock(&spin_lock);
 #if PY_DEBUG
     fprintf(stderr,"we call the sc_close method, and the return value is %d\n",ret);
 #endif
     //goto sc_close_exit;
 
 sc_close_error:
-    pthread_spin_lock(&spin_lock);
     if(NULL!=pretval){Py_DECREF(pretval);};
-    pthread_spin_unlock(&spin_lock);
 sc_close_exit:
     return ret;
 }
