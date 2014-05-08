@@ -1,6 +1,7 @@
 // C代码调，用上面的add函数  
 #include <stdio.h>  
 #include <stdlib.h>  
+#include <pthread.h>
 #include "Python.h"  
   
 int main(int argc, char** argv)     // 初始化Python  
