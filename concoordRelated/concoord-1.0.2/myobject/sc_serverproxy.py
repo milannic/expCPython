@@ -4,7 +4,6 @@ import subprocess
 import socket
 import os
 import signal
-from timeout import timeout
 
 class SimpleConcoordServer:
 

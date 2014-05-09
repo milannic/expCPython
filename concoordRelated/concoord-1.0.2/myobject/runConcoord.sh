@@ -1,4 +1,5 @@
 #! /bin/bash
+echo $PYTHONPATH
 ps -A |grep "concoord" | awk '{print $1}' | xargs kill
 ps -A |grep "mongoose" | awk '{print $1}' | xargs kill
 concoord object -o sc_server.SimpleConcoordServer
