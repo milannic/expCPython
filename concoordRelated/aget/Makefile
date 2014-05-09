@@ -1,5 +1,5 @@
 CFLAGS=`python-config --cflags`
-LDFLAGS=`python-config --ldflags`
+LDFLAGS=`python-config --ldflags` -lrt
 CC=gcc
 LIB_NAME="./libpctern.so"
 

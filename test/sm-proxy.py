@@ -51,9 +51,30 @@ def main():
         map_file.seek(0)
         map_file.write(struct.pack("<i",ret))
         map_file.close()
-        
-
-
+    elif options.api_type == 1:
+        try:
+            pass
+        except Exception,e:
+            print e
+            pass
+    elif options.api_type == 2:
+        try:
+            pass
+        except Exception,e:
+            print e
+            pass
+    elif options.api_type == 3:
+        try:
+            pass
+        except Exception,e:
+            print e
+            pass
+    elif options.api_type == 4:
+        try:
+            pass
+        except Exception,e:
+            print e
+            pass
 
 
 if __name__=="__main__":

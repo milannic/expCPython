@@ -59,7 +59,7 @@
 // this should be in a configuration file in the later time
 static char* module_name = "sc_serverproxy";
 static char* class_name = "SimpleConcoordServer";
-static char* replica_group = "127.0.0.1:14001";
+static char* replica_group = "127.0.0.1:14000";
 
 // with embedded python, we must carefully check every PyObject's reference to keep python runtime work correctly
 

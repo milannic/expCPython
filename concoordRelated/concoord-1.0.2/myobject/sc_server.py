@@ -27,7 +27,7 @@ class SimpleConcoordServer():
         self.socket_count = 0
         self.socket_dict = {}
         self.running = 0
-        self.debug=1
+        self.debug=0
 
     #test function, just to make sure this concoord object works
     def test(self):
@@ -139,6 +139,7 @@ class SimpleConcoordServer():
             if self.debug:
                 print socket_num
                 print data
+                print len(data)
                 print "send is called successfully"
                 print "*"*20
             return len(data)
