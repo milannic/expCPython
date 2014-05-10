@@ -27,7 +27,7 @@ class SimpleConcoordServer():
         self.socket_count = 0
         self.socket_dict = {}
         self.running = 0
-        self.debug=0
+        self.debug=1
 
     #test function, just to make sure this concoord object works
     def test(self):

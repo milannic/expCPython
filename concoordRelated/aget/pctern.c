@@ -40,7 +40,7 @@
 #include <pthread.h>
 #include <sys/socket.h> 
 #include <execinfo.h> 
-#include "Python.h" 
+//#include "Python.h" 
 #include "enter_sys.h"
 #include "pythonapi.h"
 
@@ -172,7 +172,7 @@ int close(int fd) {
     fprintf(stderr,"now check_sys() = %d \n",check_sys());
 #endif
 
-    if(!check_sys() && fd>=10000){
+    if(!check_sys()){
 
 #if LD_DEBUG
         fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
@@ -192,5 +192,31 @@ int close(int fd) {
 //   errno = 22;
      return ret;
 }
-#if 0
+
+static void (*fp_pthread_exit)(void* retval);
+void pthread_exit(void* retval) {
+    int ret =-1;
+
+#if LD_DEBUG
+    fprintf(stderr,"now check_sys() = %d \n",check_sys());
 #endif
+
+    if(!check_sys()){
+
+#if LD_DEBUG
+        fprintf(stderr,"now I am calling the fake %s function\n",__FUNCTION__);
+#endif
+
+        enter_sys();
+        sc_pthread_exit(retval);
+        leave_sys();
+    }else{
+
+#if LD_DEBUG
+        fprintf(stderr,"now I am calling the real %s function\n",__FUNCTION__);
+#endif
+        RESOLVE(pthread_exit);
+        fp_pthread_exit(retval);
+    }
+}
+

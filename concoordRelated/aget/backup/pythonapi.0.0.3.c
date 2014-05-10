@@ -85,13 +85,15 @@ static char* replica_group = "127.0.0.1:14001";
 #define SHARED_MEM_KEY_LEN 20
 #endif
 
-static int count=10000;
+static int count=100;
+static pthread_mutex_t count_lock;
 
 static int random_gen(char* buffer,int length){
     int index;
     int temp;
+    pthread_mutex_lock(&count_lock);
     srand(time(NULL)+count);
-    count+=10000;
+    count+=100;
     for( index = 0; index < length-1; index += 1 ) {
         temp = rand()%ALPHA_DICT+97;
         buffer[index] = temp;
@@ -99,6 +101,7 @@ static int random_gen(char* buffer,int length){
 //        printf("the current alpha dict is %c\n",temp);
     }
     buffer[length-1] = '\0';
+    pthread_mutex_unlock(&count_lock);
     return 0;
 
 }
@@ -187,7 +190,7 @@ sc_socket_clean:
 #if PY_DEBUG
         fprintf(stderr,"unlinking the shared memory succeed\n");
 #endif
-        ;
+        close(shared_memory_fd);
     }else{
         fprintf(stderr,"unlinking the shared memory not succeed\n");
         fprintf(stderr,"the error code is %d\n",errno);
@@ -284,7 +287,7 @@ sc_connect_clean:
 #if PY_DEBUG
         fprintf(stderr,"unlinking the shared memory succeed\n");
 #endif
-        ;
+        close(shared_memory_fd);
     }else{
         fprintf(stderr,"unlinking the shared memory not succeed\n");
         fprintf(stderr,"the error code is %d\n",errno);
@@ -388,7 +391,7 @@ sc_send_clean:
 #if PY_DEBUG
         fprintf(stderr,"unlinking the shared memory succeed\n");
 #endif
-        ;
+        close(shared_memory_fd);
     }else{
         fprintf(stderr,"unlinking the shared memory not succeed\n");
         fprintf(stderr,"the error code is %d\n",errno);
@@ -491,7 +494,7 @@ sc_recv_clean:
 #if PY_DEBUG
         fprintf(stderr,"unlinking the shared memory succeed\n");
 #endif
-        ;
+        close(shared_memory_fd);
     }else{
         fprintf(stderr,"unlinking the shared memory not succeed\n");
         fprintf(stderr,"the error code is %d\n",errno);
@@ -578,7 +581,6 @@ int sc_close(int fd){
             errno = 3;
         }
     }
-
 #if PY_DEBUG
     fprintf(stderr,"the ret value from the python script is %d\n",*(int*)shared_memory_ptr);
 #endif
@@ -589,7 +591,7 @@ sc_close_clean:
 #if PY_DEBUG
         fprintf(stderr,"unlinking the shared memory succeed\n");
 #endif
-        ;
+        close(shared_memory_fd);
     }else{
         fprintf(stderr,"unlinking the shared memory not succeed\n");
         fprintf(stderr,"the error code is %d\n",errno);

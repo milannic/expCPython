@@ -1,0 +1,33 @@
+
+Usage:
+ kill [options] <pid> [...]
+
+Options:
+ <pid> [...]            send signal to every <pid> listed
+ -<signal>, -s, --signal <signal>
+                        specify the <signal> to be sent
+ -l, --list=[<signal>]  list all signal names, or convert one to a name
+ -L, --table            list all signal names in a nice table
+
+ -h, --help     display this help and exit
+ -V, --version  output version information and exit
+
+For more details see kill(1).
+pythonapi.c:70:14: warning: ‘module_name’ defined but not used
+pythonapi.c:71:14: warning: ‘class_name’ defined but not used
+pythonapi.c:72:14: warning: ‘replica_group’ defined but not used
+<LOG> Attempting to read log file aget-hahaha.tar.log for resuming download job...
+<LOG> Couldn't find log file for this download, starting a clean job...
+sc_socket is called 
+my random string is atbjaeyjmxkgmxtqbpr
+the shared memory descriptor is 3
+creating the shared memory succeed
+truncating the shared memory succeed
+haha
+the ret value from the python script is 10006
+sc_connect is called 
+haha
+the ret value from the python script is 0
+<LOG> Head-Request Connection established
+sc_send is called 
+haha
