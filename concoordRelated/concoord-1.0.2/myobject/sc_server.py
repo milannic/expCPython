@@ -10,7 +10,7 @@ import subprocess
 import socket
 import os
 import signal
-from timeout import timeout
+#from timeout import timeout
 #import urllib2
 #import sysv_ipc
 #import requests
@@ -21,7 +21,7 @@ class SimpleConcoordServer():
     def __init__(self):
         self.running = 0
         #default parameter
-        self.bin_args = ["/home/milannic/expCPython/concoordRelated/mongoose/mongoose","-t 2"]
+        self.bin_args = ["../../mongoose/mongoose","-t 2"]
         #default path
         self.socket_base = 10000
         self.socket_count = 0

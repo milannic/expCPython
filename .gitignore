@@ -22,4 +22,6 @@
 *.x86_64
 *.hex
 *.swp
-
+*.pyc
+concoordRelated/aget/input.tar
+*.orig
