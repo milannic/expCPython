@@ -1,33 +1,33 @@
-#PYTHONHEAD=/usr/include/python2.7
-CFLAGS= -c `python-config --cflags`
-LFLAGS= `python-config --ldflags`
+#CFLAGS=`python-config --cflags`
+LDFLAGS=`python-config --ldflags` -lrt
+#LDFLAGS= -lrt
 CC=gcc
+LIB_NAME="./libpctern.so"
 
-PROG=cpython.out \
-	 cpython_localtest.out \
-	 cpython_0.0.1.out \
+target = libpctern.so.1.0 \
 
-.SUFFIXES: .c .o
+all:$(target)
+
+libpctern.so.1.0:pctern.o enter_sys.o pythonapi.o
+	$(CC) $^ -Wl,-soname,libpctern.so.1 -rdynamic -shared -fpic -o $@ $(LDFLAGS) 
 
 .c.o:
-	$(CC) $(CFLAGS) $< -o $@
-
-default: all
-
-all: $(PROG)
+	$(CC) $(CFLAGS) -fpic -g -c -o $@ $^
 
 
-cpython_localtest.out: cpython_localtest.o
-	$(CC) $< $(LFLAGS)  -o $@
+.PHONY: clean link run
 
-cpython_0.0.1.out: cpython_0.0.1.o
-	$(CC) $< $(LFLAGS)  -o $@
+link:
+	ln -sf libpctern.so.1.0 libpctern.so.1
+	ln -sf libpctern.so.1.0 libpctern.so
 
-cpython.out: cpython.o
-	$(CC) $< $(LFLAGS)  -o $@
-
-.PHONY:clean
 clean:
-	$(RM) *.o
-	$(RM) $(PROG)
-	$(RM) *.pyc
+	rm -rf *.o
+	rm -rf *.out
+	rm -rf libpctern*
+	rm -rf $(target)
+	rm -rf *.log
+run:
+	LD_PRELOAD=$(LIB_NAME) ./aget -f -n1 -p 8080 http://localhost/test.py &
+	sleep 5
+	LD_PRELOAD=$(LIB_NAME) ./aget -f -n1 -p 8080 http://localhost/haha.py &
