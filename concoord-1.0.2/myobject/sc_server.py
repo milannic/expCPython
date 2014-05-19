@@ -27,7 +27,7 @@ class SimpleConcoordServer():
         self.socket_count = 0
         self.socket_dict = {}
         self.running = 0
-        self.debug=1
+        self.debug=0
 
     #test function, just to make sure this concoord object works
     def test(self):
@@ -154,6 +154,8 @@ class SimpleConcoordServer():
                 print "*"*10+"now we are recv"+"*"*10
             my_socket = self.socket_dict[socket_num-self.socket_base]
             data = my_socket.recv(buff_size,flags)
+            if not self.debug:
+                print socket_num
             if self.debug:
                 print socket_num
                 print data
