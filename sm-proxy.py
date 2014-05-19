@@ -17,7 +17,7 @@ import json
 # now we just hardcore the server address as 127.0.0.1:14001
 
 #replica_group = "127.0.0.1:14000"
-replica_group = "128.59.17.171:14001"
+replica_group = "128.59.17.171:14000,128.59.17.173:14000"
 
 
 

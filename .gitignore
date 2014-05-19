@@ -23,5 +23,7 @@
 *.hex
 *.swp
 *.pyc
-concoordRelated/aget/input.tar
+input.tar
+log
 *.orig
+
